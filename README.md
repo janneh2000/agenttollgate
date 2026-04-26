@@ -301,6 +301,7 @@ agenttollgate/
 | MCP discovery          | ✗                     | ✗                              | **first-class**                             |
 | Sub-cent price points  | impractical (fees)    | possible                       | **trivial — settled in micros**             |
 
+---
 
 ## License
 
