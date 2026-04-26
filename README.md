@@ -13,6 +13,76 @@ Built for **[Locus' Paygentic Hackathon — Week 3 (CheckoutWithLocus track)](ht
 
 ---
 
+## For hackathon judges — run the demo in 60 seconds
+
+You don't need a Locus API key. The repo ships with a **mock-mode** that simulates the full CheckoutWithLocus loop end-to-end.
+
+```bash
+git clone https://github.com/janneh2000/agenttollgate
+cd agenttollgate
+npm install --legacy-peer-deps
+cp .env.example .env
+npm run seed     # loads 8 demo tollgates + 24h of synthetic agent traffic
+npm run dev      # → http://localhost:3000
+```
+
+> **If `npm install` complains about better-sqlite3 bindings**, run `npm rebuild better-sqlite3 --build-from-source` once and `npm run dev` again.
+
+Then open these in order to see the full system:
+
+| URL | What you'll see |
+|-----|-----------------|
+| `http://localhost:3000` | Landing page — pitch + live demo CTA |
+| `http://localhost:3000/dashboard` | Merchant dashboard — live revenue, p95 latency, top agents, recent 402→paid sessions |
+| `http://localhost:3000/catalog` | Public catalog of tollgates (the same surface MCP clients see) |
+| `http://localhost:3000/dashboard/new` | The "wrap any URL in 60 seconds" wizard |
+| `http://localhost:3000/docs` | Agent SDK docs + curl examples |
+
+### See the 402 → pay → replay loop with curl
+
+Pick any tollgate slug from `/catalog` (e.g. `image-gen-pro-XXXXX`) and run:
+
+```bash
+SLUG=<paste-slug-here>
+
+# 1. First call — no payment → 402 Payment Required + Locus pay_url + session_id
+curl -i http://localhost:3000/api/proxy/$SLUG \
+  -H "x-agent-id: agent_judge_demo" \
+  -H "content-type: application/json" \
+  -d '{"prompt":"a tollbooth in space"}'
+
+# 2. Settle the mock Locus session (in real mode this is the agent paying via Locus)
+SESSION=<paste session_id from step 1>
+curl -X POST http://localhost:3000/api/checkout/pay/$SESSION
+
+# 3. Retry with the receipt — proxy replays upstream + returns the real response
+curl -i http://localhost:3000/api/proxy/$SLUG \
+  -H "x-agent-id: agent_judge_demo" \
+  -H "x-locus-receipt: $SESSION" \
+  -d '{"prompt":"a tollbooth in space"}'
+```
+
+Refresh `/dashboard` after step 3 — you'll see revenue tick up, the new agent appear, and the 402→paid session in the recent-calls list.
+
+### Where to look in the code
+
+| File | What to verify |
+|------|----------------|
+| `src/lib/locus.ts` | The CheckoutWithLocus client — `preflight`, `confirm`, `verifyWebhookSignature`. The whole integration is in one file. |
+| `src/app/api/proxy/[slug]/route.ts` | The 402 protocol — mints session, returns `pay_url`, replays upstream after `confirm`. |
+| `src/app/api/checkout/webhook/route.ts` | HMAC-SHA256 webhook verification. |
+| `src/lib/policy.ts` | Declarative spend-policy DSL. |
+| `src/lib/reputation.ts` | Reputation scoring (0–1000) + price-multiplier formula. |
+| `scripts/mcp-server.ts` | The MCP server that exposes tollgates to Claude/Cursor/ChatGPT. |
+
+### Switching to a real Locus key
+
+Drop real keys into `.env` (`LOCUS_API_KEY`, `LOCUS_API_BASE`, `LOCUS_MERCHANT_ID`, `LOCUS_WEBHOOK_SECRET`) — mock mode auto-disables, real `pay_url`s are issued, webhooks get HMAC-verified. Nothing else changes.
+
+📄 Full pitch deck: [`PitchDeck.pdf`](PitchDeck.pdf) · 📐 Architecture write-up: [`ARCHITECTURE.md`](ARCHITECTURE.md) · 🎬 Demo script: [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md)
+
+---
+
 ## What it is
 
 AI agents are starting to call APIs the way humans call shops — *programmatically and
@@ -231,34 +301,6 @@ agenttollgate/
 | MCP discovery          | ✗                     | ✗                              | **first-class**                             |
 | Sub-cent price points  | impractical (fees)    | possible                       | **trivial — settled in micros**             |
 
----
-
-## Devfolio submission copy
-
-```
-Tagline:
-The 60-second paywall for the agentic economy. Drop in CheckoutWithLocus on any HTTP API.
-
-Description:
-AgentTollgate lets any developer wrap any HTTP endpoint behind a CheckoutWithLocus paywall
-in under a minute. AI agents discover via MCP, preflight, pay in USDC on Base, and consume —
-with built-in policy enforcement, reputation-aware pricing, and live analytics. We extend
-the Locus suite with three new primitives merchants can't easily build themselves:
-(1) a declarative spend-policy DSL, (2) reputation-aware pricing computed from the on-chain
-audit trail Locus already gives us, and (3) automatic MCP catalog publication so any LLM
-client can discover and pay-and-call tollgated endpoints natively.
-
-How it uses CheckoutWithLocus:
-We mint a Locus checkout session for every paywalled call (preflight), wait for the
-HMAC-signed paid webhook, and replay the captured upstream request. The whole loop is
-encapsulated in src/lib/locus.ts so production keys swap in without touching anything else.
-A built-in mock mode lets reviewers run the full demo with no Locus key.
-
-Track:
-Week 3 — CheckoutWithLocus
-```
-
----
 
 ## License
 
