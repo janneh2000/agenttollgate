@@ -1,0 +1,30 @@
+node_modules
+.next
+out
+dist
+.env
+.env.local
+.env.*.local
+data/*.db
+data/*.db-journal
+.DS_Store
+*.log
+.vercel
+.idea
+.vscode
+
+# Build artifacts
+tsconfig.tsbuildinfo
+
+# SQLite runtime files
+data/*.db-shm
+data/*.db-wal
+
+# Pitch deck working tree (keep PitchDeck.pdf/.pptx at the project root only)
+deck/v2/
+deck/node_modules/
+deck/.~lock.*
+deck/*.tmp
+deck/slide-*.jpg
+deck/AgentTollgate-Pitch.pdf
+deck/AgentTollgate-Pitch.pptx
